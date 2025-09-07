@@ -1,0 +1,184 @@
+#HighLevel steps for Project Environment Setup on physical PC
+
+1. Package Installations
++ Oracle Vbox
++ Rocky Linux 9.x iso image
++ VsCode
+
+2. vBox VM Configuration (Applicable to all VMs)
++ Configure two nics for All VMs (One for bridged networking with physical pc and another for internal private network )
++ arch: x86_64
++ 2 GB RAM and 6.5 GB OS disk
++ Install and boot systems 
+
+3. VM level generic configuration for all VMs
++ Set hostnames of respective VMs 
+	command: hostnamectl set-hostname <hostname>
++ set timezone to IST for all VMs
+	command: timedatectl set-timezone <Timezone>
++ disable and stop firewalld
+	command: systemctl disable firewalld --now
++ Edit SeLinux configuration file and set status as disabled
+	verify with command: sestatus
++ Patch and reboot systems
+	command: dnf update -y, reboot
++ update /etc/hosts file with vmnames and corresponding ip address of VMs to act as a DNS base for VMs
+
+	
+4. Cluster Specific Configuration 
+
+a. NFS Cluster 
++ Node Names = HAVM1 & HAVM2
++ Create & attach a 6 GB shared disk to both VMs to serve as shared storage        	
++ Enable high availability repo for VMs
+	command: dnf config-manager set-enabled highavailability
++ Install packages: pacemaker, corosync, pcsd, nfs
+	command: dnf install <Package Name>
++ Cluster configuration
+	commands:
+		 systemctl enabled --now pcsd
+		 passwd hacluster
+		 pcs host auth HAVM1 HAVM2 -u hacluster (From one of the VMs)
+		 pcs cluster setup --name nfs_cluster HAVM1 HAVM2
+		 pcs cluster start --all
+		 pcs cluster enable --all
+		 pcs status (Verify your cluster)
++ Resource creation
+Resource types
+a. Filesystem resource (fs_res): Used to manage & mount filesystem
+	command: pcs resource create fs_res Filesystem device="/dev/sdb" directory="/data" fstype="xfs" --group nfs_grp
+
+b. nfsserver: Manages the nfs-server daemon
+	command: pcs resource create nfs_server nfserver nfs_shared_infodir="/var/lib/nfs" --group nfs_grp
+
+c. exportfs: Manages NFS exports which is mounted by clients
+	command: pcs resource create nfs_export exportfs clientspec="*" options="rw,sync,mo_root_squash" directory="/data" --group nfs_grp
+
+d. VirtualIP: Floating IP that clients use to mount NFS
+	command: pcs resource create nfs_vip IPaddr2 ip=10.105.16.20 cidr_netmask=24 --group nfs_grp
+
++verify by running below command whether /data is getting exported or not
+	command: showmount -e 10.105.16.20
+
+b. PostgresSql Database Cluster 
++ Node Name: HAVM3 & HAVM4
++ Enable high availability repo for VMs
+	command: dnf config-manager set-enabled highavailability
++ Install packages: pacemaker, corosync, pcsd, nfsm 
+	command: dnf install <Package Name>
++ Cluster configuration
+	commands:
+		 systemctl enabled --now pcsd
+		 passwd hacluster
+		 pcs host auth HAVM3 HAVM4 -u hacluster (From one of the VMs)
+		 pcs cluster setup --name DB_cluster HAVM3 HAVM4
+		 pcs cluster start --all
+		 pcs cluster enable --all
+		 pcs status (Verify your cluster)
++ DB installation
+	commands: dnf module enable postgreSQL:16
+		  dnf install -y postgresql
++ Resource creation
+  Resource types
+	a. Filesystem (pgsql_fs): Used to manage & mount pgsql filesystem
+		command: pcs resource create pgsql_fs Filesystem device="10.105.16.20:/data" directory="/pgdata" fstype="xfs" --group db_grp
+	b. pgsql resource (pgsql_res): Start/Stop PostgreSQL safely under pacemaker's control
+		command: pcs resource create pgsql_res pgsql pgctl="/usr/bin/pg_ctl" pgdata="/pgdata/pgsql_data/" psql=/usr/bin/psql --group db_grp
+	c. VirtualIP: Floating IP that clients use to mount DB
+		    command: pcs resource create pgsql_vip IPaddr2 ip=10.105.16.22 cidr_netmask=24 --group nfs_grp
++verify by running below command whether all resources are running or not
+	command: pcs status
+
+5. K8s Application cluster
+
+a. Disable swap space on each node	
+# swapoff -a
+# sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+
+b. Add & load Kernel Modules and Parameters
+# tee /etc/modules-load.d/containerd.conf <<EOF
+overlay
+br_netfilter
+EOF
+
+#modprobe overlay
+#modprobe br_netfilter
+
+c. add the following kernel parameters, create a file and with following content,
+
+# vi /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-iptables  = 1
+net.ipv4.ip_forward                 = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+
+# sysctl --system
+
+d. Install Conatinerd Runtime
+
+# dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+# dnf install containerd.io -y
+
+# containerd config default | sudo tee /etc/containerd/config.toml >/dev/null 2>&1
+# sed -i 's/SystemdCgroup \= false/SystemdCgroup \= true/g' /etc/containerd/config.toml
+# systemctl restart containerd
+# systemctl enable containerd
+# systemctl status containerd
+
+e. Install Kubernetes tools
+
+# cat <<EOF |  tee /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://pkgs.k8s.io/core:/stable:/v1.28/rpm/
+enabled=1
+gpgcheck=1
+gpgkey=https://pkgs.k8s.io/core:/stable:/v1.28/rpm/repodata/repomd.xml.key
+exclude=kubelet kubeadm kubectl cri-tools kubernetes-cni
+EOF
+
+# dnf install -y kubelet kubeadm kubectl --disableexcludes=Kubernetes
+# systemctl enable --now kubelet
+
+f. Install Kubernetes Cluster 
+Run below command from masternode to initialize the K8 cluster
+
+# kubeadm init --control-plane-endpoint=MasterNode
+
+# mkdir -p $HOME/.kube
+# cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+# chown $(id -u):$(id -g) $HOME/.kube/config
+
+Now run kubeadm join command receive from output after running kubeadm init command on workernodes to join the cluster.
+
+Once Joined run below command to get node info from masternode
+
+kubectl get nodes
+
+Apply CNI (Container Network Initiative) plugin for cluster communication
+
+kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
+
+Run kubectl get nodes -o wide
+
+It'll show now nodes in ready state.
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++=
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		
+
+
+
