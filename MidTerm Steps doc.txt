@@ -162,8 +162,59 @@ Run kubectl get nodes -o wide
 
 It'll show now nodes in ready state.
 
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++=
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  
+Test Cases
+
+# Pacemaker cluster failover testing
+RUN: pcs status command
+see resources currently running on the node
+reboot/poweroff the node currently hosting  resource.
+Login to other node of cluster
+Run: pcs status
+Resoruces are succssfully migrated to other node without any manaul intervention.
+
+# DB / NFS cluster integration testing
+
+stop  NFS Cluster using below command
+ pcs cluster stop --all
+
+Login to DB cluster and run 'pcs status'
+
+All resources are currently in stopped state.
+
+Again start NFS cluster using below command
+
+pcs cluster start --all
+
+Now, run pcs status on DB cluster
+you'll see DB cluster services now running perfectly fine.
+
+# K8s Cluster Testing
+
+create a deployment using below commands
+
+kubectl create deployment web-app01 --image nginx --replicas 2
+kubectl expose deployment web-app01 --type NodePort --port 80
+kubectl get deployment web-app01
+kubectl get pods
+kubectl get svc web-app01
+
+Now, run below commadn to connect to out nginx webserver deployment
+
+curl <workernodename>:<svc port> 
+
+It'll show a welcome meesage confirming that out webserver is running fine.
+
+Now, poweroff one of the workernode
+
+Run again: kubectl get deployment web-app01
+
+Observe, that the pod running on stpped node is now terminating and once new container got created on the active node to maintain the replica count of 2.
+
+It depicts that out K8 cluster configuration is perfectly fine and it has self healing capabilities.
+
+
 
 
 
@@ -179,6 +230,7 @@ It'll show now nodes in ready state.
 
 
 		
+
 
 
 
