@@ -212,7 +212,7 @@ Run again: kubectl get deployment web-app01
 
 Observe, that the pod running on stpped node is now terminating and once new container got created on the active node to maintain the replica count of 2.
 
-It depicts that out K8 cluster configuration is perfectly fine and it has self healing capabilities.
+It depicts that our K8 cluster configuration is perfectly fine and it has self healing capabilities.
 
 
 
@@ -230,6 +230,7 @@ It depicts that out K8 cluster configuration is perfectly fine and it has self h
 
 
 		
+
 
 
 
