@@ -1,0 +1,17 @@
+#Project App structure
+
+clusterpulse-dashboard/
+├── app/
+│   ├── main.py
+│   ├── templates/
+│   │   └── index.html
+│   └── static/
+│       └── style.css
+├── requirements.txt
+├── Dockerfile
+├── k8s/
+│   ├── deployment.yaml
+│   ├── service.yaml
+│   ├── nfs-pv.yaml
+│   └── nfs-pvc.yaml
+├── README.md
