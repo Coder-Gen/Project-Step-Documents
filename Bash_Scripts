@@ -11,7 +11,7 @@ LOG_FILE="/tmp/port-forward.log"             # Optional log file
 echo "Starting persistent port-forward loop for $SERVICE_NAME ($LOCAL_PORT → $REMOTE_PORT)..."
 
 while true; do
-  echo "$(date) 🔗 Attempting port-forward..." >> "$LOG_FILE"
+  echo "$(date)  Attempting port-forward..." >> "$LOG_FILE"
   
   # Run port-forward silently in background
   kubectl port-forward svc/"$SERVICE_NAME" "$LOCAL_PORT":"$REMOTE_PORT" -n "$NAMESPACE" >> "$LOG_FILE" 2>&1
