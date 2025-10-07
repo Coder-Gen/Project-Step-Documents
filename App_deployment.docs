@@ -1,6 +1,6 @@
 #Project App structure
 
-clusterpulse-dashboard/
+clusterpulse-monitor/
 ├── app/
 │   ├── main.py
 │   ├── templates/
