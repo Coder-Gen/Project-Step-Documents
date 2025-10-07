@@ -1,21 +1,28 @@
 #!/bin/bash
 
-# === CONFIGURATION ===
-NAMESPACE="default"                          # Change if needed
-SERVICE_NAME="clusterpulse-svc"                  # service name in cluster
-LOCAL_PORT=8080                              # Port on local machine
-REMOTE_PORT=80                               # Port exposed by the service
-LOG_FILE="/tmp/port-forward.log"             # Optional log file
+NAMESPACE="default"
+SERVICE_NAME="clusterpulse-service"
+LOCAL_PORT=8080
+REMOTE_PORT=80
+LOG_FILE="/tmp/port-forward.log"
 
-# === LOOP FOREVER ===
-echo "Starting persistent port-forward loop for $SERVICE_NAME ($LOCAL_PORT → $REMOTE_PORT)..."
+echo "$(date) Starting persistent port-forward loop for $SERVICE_NAME ($LOCAL_PORT -> $REMOTE_PORT)..."
+
+start_port_forward() {
+  kubectl port-forward svc/"$SERVICE_NAME" "$LOCAL_PORT":"$REMOTE_PORT" -n "$NAMESPACE" >> "$LOG_FILE" 2>&1
+  return $?
+}
 
 while true; do
-  echo "$(date)  Attempting port-forward..." >> "$LOG_FILE"
-  
-  # Run port-forward silently in background
-  kubectl port-forward svc/"$SERVICE_NAME" "$LOCAL_PORT":"$REMOTE_PORT" -n "$NAMESPACE" >> "$LOG_FILE" 2>&1
-  
-  echo "$(date)  Port-forward stopped. Retrying in 5 seconds..." >> "$LOG_FILE"
-  sleep 5
+  start_port_forward
+  EXIT_CODE=$?
+
+  if [ $EXIT_CODE -ne 0 ]; then
+    echo "$(date) Port-forward failed with exit code $EXIT_CODE. Retrying in 5 seconds..." >> "$LOG_FILE"
+    sleep 5
+  else
+    echo "$(date) Port-forward exited cleanly. Not retrying." >> "$LOG_FILE"
+    break
+  fi
 done
+
