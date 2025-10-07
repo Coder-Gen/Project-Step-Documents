@@ -15,3 +15,34 @@ clusterpulse-dashboard/
 │   ├── nfs-pv.yaml
 │   └── nfs-pvc.yaml
 ├── README.md
+
+
+********************************Deployment steps*****************************************
+
+Build docker image and store it into ghcr
+
+RUN: docker build -t ghcr.io/coder-gen/<imange name>:v1 .
+Specify the image location in deployment file
+
+clone the clusterpulse app from git repo to the masternode
+Command: git clone https://github.com/Coder-Gen/clusterpulse-monitor.git
+
+Navigate to the directory containining App files
+Change directory to K8s using: cd k8s
+run:
+kubectl apply -f nfs-pv.yaml
+kubectl apply -f nfs-pvc.yaml
+kubectl apply -f deployment.yaml
+kubectl apply -f service.yaml
+or 
+kubectl apply -f .
+
+Validate deployment using: kubectl get deployment -o wide
+
+validate service using: kubectl get svc -o wide
+
+validate pods running application using: kubectl get pods -o wide
+
+Hurray! Your application is up and running now.
+
+
