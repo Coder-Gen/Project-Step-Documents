@@ -1,0 +1,30 @@
+#Required for exposing native clusterPulse app to the internet
+
+Steps:
+
+*********************************Azure********************************
+Create an Azure VM with public ip
+Allow port 9090 in Firewall
+Enable below paramters in sshd_config
+AllowTcpForwarding yes
+GatewayPorts yes        
+
+Restart sshd service
+systemctl enable restart sshd
+
+
+**********************8Masternode in OracleVbox*************************
+
+Ensure connectivity to the server Azure VM public ip: 20.2.250.86
+curl -v telnet://20.2.250.86:22
+
+Run following command to expose the Application to the internet
+
+ssh -R 9090:localhost:3000 localadmin@20.2.250.86
+
+Access the app to below URL from anywhere over the internet
+
+URL: http://20.2.250.86:9090/db
+
+
+
